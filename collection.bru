@@ -1,0 +1,106 @@
+meta {
+  name: Videos OAuth2
+}
+
+auth {
+  mode: oauth2
+}
+
+auth:oauth2 {
+  grant_type: authorization_code
+  callback_url: http://127.0.0.1/:3000
+  authorization_url: https://accounts.google.com/o/oauth2/v2/auth
+  access_token_url: https://oauth2.googleapis.com/token
+  refresh_token_url: https://oauth2.googleapis.com/token
+  client_id: {{clientID}}
+  client_secret: {{clientSecret}}
+  scope: https://www.googleapis.com/auth/youtube.readonly
+  state: 
+  pkce: true
+  credentials_placement: basic_auth_header
+  credentials_id: credentials
+  token_placement: url
+  token_query_key: access_token
+  auto_fetch_token: true
+  auto_refresh_token: true
+}
+
+auth:oauth2:additional_params:auth_req:headers {
+  access_type: offline
+}
+
+auth:oauth2:additional_params:access_token_req:headers {
+  access_type: offline
+}
+
+script:pre-request {
+  // Pre-request Script (Bruno)
+  
+  const videoIDs = [];
+  
+  let i = 1;
+  while (true) {
+    const key = `videoID-${i}`;
+    const val = bru.getEnvVar(key); // env var lookup by key
+  
+    if (val == null || val === "") break; // stop at first missing/empty
+  
+    videoIDs.push(String(val));
+    i++;
+  }
+  
+  console.log(`${videoIDs.length} video IDs found`);
+  
+  bru.setEnvVar("videoIDs", videoIDs.join(","), { persist: true });
+  bru.setEnvVar("videoCount", String(videoIDs.length), { persist: true });
+  
+  console.log("videoIDs:", videoIDs.join(","));
+  console.log("videoCount:", videoIDs.length);
+}
+
+script:post-response {
+  test("Status code is 200", function () {
+      expect(res.getStatus()).to.equal(200);
+  });
+  
+  
+  const videoIDs = bru.getEnvVar("videoIDs").split(",").sort();
+  const videoCount = bru.getEnvVar("videoCount");
+  const jsonData = res.getBody();
+  const totalResults = jsonData.pageInfo.totalResults;
+  
+  // // expected same number of results as videoCount
+  // // pm.test(`Expected ${videoCount} results`, function () {
+  // //     pm.expect(totalResults).to.eql(videoCount);
+  // });
+  
+  const missingResults = videoCount - totalResults;
+  if (!!missingResults) {
+      const items = jsonData.items;
+      const idsReturned = [];
+      for (let i of items) {
+          idsReturned.push(i.id);
+      }
+      console.log(missingResults, "results missing");
+      console.log("video ids:", videoIDs);
+      // items array should contain results
+      test("Expected items array", function () {
+          expect(items).to.not.be.empty;
+      });
+  
+      for (let v of videoIDs) {
+          console.log("items[v]:", items[v])
+          test(`Expected to return ${v} in results`, function () {
+              expect(idsReturned).to.include(v);
+          });
+      }
+  }
+  
+  // // pm.test("Body matches string", function () {
+  // //     pm.expect(pm.response.text()).to.include("string_you_want_to_search");
+  // });
+}
+
+docs {
+  YouTube Data V3 API using OAuth2 for auth
+}

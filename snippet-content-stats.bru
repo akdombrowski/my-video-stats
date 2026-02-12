@@ -1,0 +1,31 @@
+meta {
+  name: snippet-content-stats
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{videosPath}}?id={{videoIDs}}&part=snippet%2CcontentDetails%2Cstatistics&maxResults=2
+  body: none
+  auth: inherit
+}
+
+params:query {
+  id: {{videoIDs}}
+  part: snippet%2CcontentDetails%2Cstatistics
+  maxResults: 2
+  ~key: {{API_KEY}}
+}
+
+headers {
+  Accept: application/json
+  Referer: https://domz-devz.postman.co/
+}
+
+script:pre-request {
+  // script at collection level
+}
+
+settings {
+  encodeUrl: true
+}
